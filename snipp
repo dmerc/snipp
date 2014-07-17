@@ -1,0 +1,168 @@
+#!/bin/bash
+
+# command line snippets
+# @author github.com/dmerc (dmerc.net)
+
+# source snipp_completion for bash completion
+
+SNIPPATH=~/.snipp/
+VERSION="0.1"
+PRINTER="less -r "
+
+# disable color when piped
+[[ -t 1 ]] && COLORED=1 || COLORED=0
+WARNINGS=1
+ONLYPRINTSNIPPPATH=0
+
+if [ ! -d $SNIPPATH ]; then
+  mkdir -p $SNIPPATH
+fi
+
+# --------- FUNCTIONS
+usage(){
+  echo -n "$(basename $0) [OPTIONS] ACTION SNIPPET
+Manage text snippets.
+
+ Actions:
+  e|edit            Edit the specified snippet, using \$EDITOR
+  s|show            Show the specified snippet
+  ls|list           List all snippets
+  rm|remove         Remove a snippet
+ Options:
+  -p, --print       Show snippet without a pager
+  -h, --help        Display this help and exit
+  -v, --version     Output version information and exit
+      --nocolor     Disable color
+      --nowarn      Disable warnings
+      --printpath   Prints the snippet file's path, and exits. Only for show action.
+
+ Examples:
+  snipp show bash # shows snippet on bash
+  snipp edit cpp  # opens cpp snippet in \$EDITOR
+  snipp html      # shows snippet on html
+"
+}
+require_arguments(){
+  if [[ $# -lt 2 ]]; then
+    echo '** not enough arguments **'
+    exit 0
+  fi
+}
+warn(){
+  if [ $WARNINGS == 1 ]; then
+    echo "$1"
+  fi
+}
+action_edit(){
+  snippet=$SNIPPATH$1
+  $EDITOR $snippet
+}
+action_list(){
+  ls $SNIPPATH
+}
+action_delete(){
+  snippet=$SNIPPATH$1
+  if [ -f $snippet ]; then
+    rm -i $snippet
+  else
+    warn "** Snippet '$1' does not exist **"
+    exit 1
+  fi
+}
+action_show(){
+  snippet=$SNIPPATH$1
+
+  if [ $ONLYPRINTSNIPPPATH == 1 ]; then
+    echo $snippet
+    exit 0
+  fi
+
+  if [ -f $snippet ]; then
+    if [ $COLORED == 1 ]; then
+      show_colored $snippet
+    else
+      $PRINTER $snippet
+    fi
+  else
+    warn "** Snippet '$1' does not exist **"
+    exit 1
+  fi
+}
+show_colored(){
+  if hash pygmentize 2>/dev/null; then
+    detect_pygments_lexer $1
+    if [ -n "$_OPT" ]; then
+      pygmentize $_OPT $1 | $PRINTER
+    else
+      warn "cant detect syntax for highlighting, use a file extension"
+      warn "or add the string 'syntax:something' to the head of this snippet"
+      $PRINTER $snippet
+    fi
+  else
+    warn "install 'pygments' for snippet syntax highlighting"
+    $PRINTER $snippet
+  fi
+}
+detect_pygments_lexer(){
+  _OPT=""
+  if [ -z "${1//[^.]/}" ]; then
+    # has an extension. delegate detection to pygments.
+    return
+  else
+    # try to find "syntax:something" in the head of the file
+    lexer=$(head -n 2 $1 | grep -oE "syntax:.*([[:space:]]|$)" | head -n 1; echo "x")
+    # this preserves newlines from the subshell
+    lexer="${lexer%x}"
+    # cutout <lexer> from the "... syntax:<lexer> ...." line
+    lexer=${lexer#*syntax:}
+    lexer=${lexer% *}
+    if [ -n "$lexer" ]; then
+      _OPT="-l $lexer"
+    else
+      _OPT=""
+    fi
+  fi
+}
+
+
+# --------- PARSE INPUT/OPTIONS
+
+[[ $# -eq 0 ]] && set -- "--help"
+
+# Read the options and set stuff
+while [[ $1 = -?* ]]; do
+  case $1 in
+    -h|--help) usage >&2; exit 0 ;;
+    -v|--version) echo "$(basename $0) $VERSION"; exit 0 ;;
+    -p|--print) PRINTER=cat ;;
+    --nocolor) COLORED=0 ;;
+    --nowarn) WARNINGS=0 ;;
+    --printpath) ONLYPRINTSNIPPPATH=1 ;;
+    --endopts) shift; break ;;
+    *) warn "** Invalid option '$1' **"; exit 1 ;;
+  esac
+  shift
+done
+case $1 in
+  s|show)
+    require_arguments $@;
+    SNIPPET=`echo -e ${2//\//_}`
+    action_show $SNIPPET
+  ;;
+  e|edit)
+    require_arguments $@;
+    SNIPPET=`echo -e ${2//\//_}`
+    action_edit $SNIPPET
+  ;;
+  ls|list)
+    action_list
+  ;;
+  rm|remove)
+    require_arguments $@;
+    SNIPPET=`echo -e ${2//\//_}`
+    action_delete $SNIPPET
+  ;;
+  *)
+    action_show $1
+  ;;
+esac
