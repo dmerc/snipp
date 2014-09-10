@@ -5,7 +5,7 @@
 
 # source snipp_completion for bash completion
 
-SNIPPATH=~/.snipp/
+SNIPP_BASEDIR=~/.snipp/
 VERSION="0.1"
 PRINTER="less -r "
 
@@ -14,8 +14,8 @@ PRINTER="less -r "
 WARNINGS=1
 ONLYPRINTSNIPPPATH=0
 
-if [ ! -d $SNIPPATH ]; then
-  mkdir -p $SNIPPATH
+if [ ! -d $SNIPP_BASEDIR ]; then
+  mkdir -p $SNIPP_BASEDIR
 fi
 
 # --------- FUNCTIONS
@@ -54,14 +54,14 @@ warn(){
   fi
 }
 action_edit(){
-  snippet=$SNIPPATH$1
+  snippet=$SNIPP_BASEDIR$1
   $EDITOR $snippet
 }
 action_list(){
-  ls $SNIPPATH
+  ls $SNIPP_BASEDIR
 }
 action_delete(){
-  snippet=$SNIPPATH$1
+  snippet=$SNIPP_BASEDIR$1
   if [ -f $snippet ]; then
     rm -i $snippet
   else
@@ -70,7 +70,7 @@ action_delete(){
   fi
 }
 action_show(){
-  snippet=$SNIPPATH$1
+  snippet=$SNIPP_BASEDIR$1
 
   if [ $ONLYPRINTSNIPPPATH == 1 ]; then
     echo $snippet
