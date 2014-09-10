@@ -5,19 +5,6 @@
 
 # source snipp_completion for bash completion
 
-SNIPP_BASEDIR=~/.snipp/
-VERSION="0.1"
-PRINTER="less -r "
-
-# disable color when piped
-[[ -t 1 ]] && COLORED=1 || COLORED=0
-WARNINGS=1
-ONLYPRINTSNIPPPATH=0
-
-if [ ! -d $SNIPP_BASEDIR ]; then
-  mkdir -p $SNIPP_BASEDIR
-fi
-
 # --------- FUNCTIONS
 usage(){
   echo -n "$(basename $0) [OPTIONS] ACTION SNIPPET
@@ -48,59 +35,103 @@ require_arguments(){
     exit 0
   fi
 }
+err(){
+  >&2 echo "$1"
+}
 warn(){
-  if [ $WARNINGS == 1 ]; then
+  if [[ $WARNINGS == 1 ]]; then
     echo "$1"
   fi
 }
+
+SNIPP_DEFAULT_BASEDIR=~/.snipp/
+# CONFIG
+if [[ ! -z "$SNIPP_BASEDIR" ]]; then
+  if [[ ! -d "$SNIPP_BASEDIR" ]]; then
+    err 'snipp base directory is set but the path is not a directory'
+    err 'aborting.'
+    exit 1
+  else
+    SNIPP_BASEDIR=$SNIPP_DEFAULT_BASEDIR
+  fi
+else
+  SNIPP_BASEDIR=$SNIPP_DEFAULT_BASEDIR
+fi
+
+VERSION="0.2"
+PRINTER="less -r "
+
+# disable color when piped
+[[ -t 1 ]] && COLORED=1 || COLORED=0
+WARNINGS=1
+ONLYPRINTSNIPPPATH=0
+
+if [ ! -d $SNIPP_BASEDIR ]; then
+  mkdir -p $SNIPP_BASEDIR
+fi
+
+# ACTIONS
 action_edit(){
-  snippet=$SNIPP_BASEDIR$1
-  $EDITOR $snippet
+  snippet_path=$SNIPP_BASEDIR$1
+  $EDITOR $snippet_path
 }
 action_list(){
   ls $SNIPP_BASEDIR
 }
 action_delete(){
-  snippet=$SNIPP_BASEDIR$1
-  if [ -f $snippet ]; then
-    rm -i $snippet
+  snippet_path=$SNIPP_BASEDIR$1
+  if [ -f $snippet_path ]; then
+    rm -i $snippet_path
   else
     warn "** Snippet '$1' does not exist **"
     exit 1
   fi
 }
 action_show(){
-  snippet=$SNIPP_BASEDIR$1
+  snippet_path=$SNIPP_BASEDIR$1
 
   if [ $ONLYPRINTSNIPPPATH == 1 ]; then
-    echo $snippet
+    echo $snippet_path
     exit 0
   fi
 
-  if [ -f $snippet ]; then
+  if [ -f $snippet_path ]; then
+
+    TMP=/tmp/snipp
+
     if [ $COLORED == 1 ]; then
-      show_colored $snippet
+      show_colored $snippet_path
     else
-      $PRINTER $snippet
+      filter_snipp_meta
+      $PRINTER $TMP
     fi
   else
     warn "** Snippet '$1' does not exist **"
     exit 1
   fi
 }
+filter_snipp_meta(){
+    # delete first line if it contains 'syntax:'
+    cat $snippet_path | sed '1,2{;/syntax:.*/d;}' > $TMP
+    # then delete first line if blank
+    sed '1{/^$/d}' $TMP
+}
 show_colored(){
   if hash pygmentize 2>/dev/null; then
     detect_pygments_lexer $1
     if [ -n "$_OPT" ]; then
-      pygmentize $_OPT $1 | $PRINTER
+      filter_snipp_meta
+      pygmentize $_OPT $TMP | $PRINTER
     else
       warn "cant detect syntax for highlighting, use a file extension"
       warn "or add the string 'syntax:something' to the head of this snippet"
-      $PRINTER $snippet
+      filter_snipp_meta
+      $PRINTER $TMP
     fi
   else
     warn "install 'pygments' for snippet syntax highlighting"
-    $PRINTER $snippet
+    filter_snipp_meta
+    $PRINTER $TMP
   fi
 }
 detect_pygments_lexer(){
