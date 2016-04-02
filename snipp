@@ -11,29 +11,24 @@ usage(){
 Manage text snippets.
 
  Actions:
-  e|edit            Edit the specified snippet, using \$EDITOR
-  s|show            Show the specified snippet
-  ls|list           List all snippets
-  rm|remove         Remove a snippet
+    edit   | e        Edit the specified snippet, using \$EDITOR
+    show   | s        Show the specified snippet
+    list   | ls       List all snippets
+    remove | rm       Remove a snippet
  Options:
-  -p, --print       Show snippet without a pager
-  -h, --help        Display this help and exit
-  -v, --version     Output version information and exit
-      --nocolor     Disable color
-      --nowarn      Disable warnings
-      --printpath   Prints the snippet file's path, and exits. Only for show action.
+    -p, --print       Show snippet without a pager
+    -h, --help        Display this help and exit
+    -v, --version     Output version information and exit
+        --nocolor     Disable color
+        --nowarn      Disable warnings
+        --printpath   Prints the snippet file's path, and exits. Only for show action.
 
  Examples:
-  snipp show bash # shows snippet on bash
-  snipp edit cpp  # opens cpp snippet in \$EDITOR
-  snipp html      # shows snippet on html
+    snipp show bash  # shows snippet on bash
+    snipp html       # shows snippet on html
+    snipp edit cpp   # opens cpp snippet in \$EDITOR
+    snipp e cpp      # also opens cpp snippet in \$EDITOR
 "
-}
-require_arguments(){
-  if [[ $# -lt 2 ]]; then
-    echo '** not enough arguments **'
-    exit 0
-  fi
 }
 err(){
   >&2 echo "$1"
@@ -41,6 +36,13 @@ err(){
 warn(){
   if [[ $WARNINGS == 1 ]]; then
     echo "$1"
+  fi
+}
+require_arguments(){
+  if [[ $# -lt 2 ]]; then
+    err '** not enough arguments **'
+    usage
+    exit 0
   fi
 }
 
@@ -58,7 +60,7 @@ else
   SNIPP_BASEDIR=$SNIPP_DEFAULT_BASEDIR
 fi
 
-VERSION="0.2"
+VERSION="0.3"
 PRINTER="less -r "
 
 # disable color when piped
@@ -110,26 +112,27 @@ action_show(){
     exit 1
   fi
 }
+
+
 filter_snipp_meta(){
     # delete first line if it contains 'syntax:'
     cat $snippet_path | sed '1,2{;/syntax:.*/d;}' > $TMP
     # then delete first line if blank
-    sed '1{/^$/d}' $TMP
+    sed '1{/^$/d}' -i $TMP
 }
 show_colored(){
   if hash pygmentize 2>/dev/null; then
     detect_pygments_lexer $1
-    if [ -n "$_OPT" ]; then
-      filter_snipp_meta
-      pygmentize $_OPT $TMP | $PRINTER
+    filter_snipp_meta
+    if [[ $(tput colors) -eq 256 ]]; then # todo check for true color support
+      _OPT_FORMATTER="-f console256"
     else
-      warn "cant detect syntax for highlighting, use a file extension"
-      warn "or add the string 'syntax:something' to the head of this snippet"
-      filter_snipp_meta
-      $PRINTER $TMP
+      _OPT_FORMATTER="-f console"
     fi
+    _OPT="-g $_OPT_FORMATTER $_OPT"
+    pygmentize $_OPT $TMP | $PRINTER
   else
-    warn "install 'pygments' for snippet syntax highlighting"
+    warn "install python library 'pygments' for snippet syntax highlighting (pip install pygments)"
     filter_snipp_meta
     $PRINTER $TMP
   fi
@@ -160,7 +163,7 @@ detect_pygments_lexer(){
 
 [[ $# -eq 0 ]] && set -- "--help"
 
-# Read the options and set stuff
+# Read and set options
 while [[ $1 = -?* ]]; do
   case $1 in
     -h|--help) usage >&2; exit 0 ;;
@@ -174,6 +177,7 @@ while [[ $1 = -?* ]]; do
   esac
   shift
 done
+
 case $1 in
   s|show)
     require_arguments $@;
