@@ -7,7 +7,7 @@
 
 # --------- FUNCTIONS
 usage(){
-  echo -n "$(basename $0) [OPTIONS] ACTION SNIPPET
+  echo -n "$(basename "$0") [OPTIONS] ACTION SNIPPET
 Manage text snippets.
 
  Actions:
@@ -61,7 +61,7 @@ else
 fi
 
 VERSION="0.3"
-PRINTER="less -r "
+PRINTER=(less -r)
 
 # disable color when piped
 [[ -t 1 ]] && COLORED=1 || COLORED=0
@@ -75,15 +75,17 @@ fi
 # ACTIONS
 action_edit(){
   snippet_path=$SNIPP_BASEDIR$1
-  $EDITOR $snippet_path
+  $EDITOR "$snippet_path"
 }
 action_list(){
   ls $SNIPP_BASEDIR
+  echo ''
+  echo "can't find what you are looking for? Try \`tldr\`"
 }
 action_delete(){
   snippet_path=$SNIPP_BASEDIR$1
-  if [ -f $snippet_path ]; then
-    rm -i $snippet_path
+  if [ -f "$snippet_path" ]; then
+    rm -i "$snippet_path"
   else
     warn "** Snippet '$1' does not exist **"
     exit 1
@@ -93,19 +95,19 @@ action_show(){
   snippet_path=$SNIPP_BASEDIR$1
 
   if [ $ONLYPRINTSNIPPPATH == 1 ]; then
-    echo $snippet_path
+    echo "$snippet_path"
     exit 0
   fi
 
-  if [ -f $snippet_path ]; then
+  if [ -f "$snippet_path" ]; then
 
     TMP=/tmp/snipp
 
     if [ $COLORED == 1 ]; then
-      show_colored $snippet_path
+      show_colored "$snippet_path"
     else
       filter_snipp_meta
-      $PRINTER $TMP
+      "${PRINTER[@]}" "$TMP"
     fi
   else
     warn "** Snippet '$1' does not exist **"
@@ -116,44 +118,47 @@ action_show(){
 
 filter_snipp_meta(){
     # delete first line if it contains 'syntax:'
-    cat $snippet_path | sed '1,2{;/syntax:.*/d;}' > $TMP
+    sed '1,2{;/syntax:.*/d;}' < "$snippet_path" > "$TMP"
     # then delete first line if blank
     sed '1{/^$/d}' -i $TMP
 }
 show_colored(){
   if hash pygmentize 2>/dev/null; then
-    detect_pygments_lexer $1
+    detect_pygments_lexer "$1"
     filter_snipp_meta
     if [[ $(tput colors) -eq 256 ]]; then # todo check for true color support
-      _OPT_FORMATTER="-f console256"
+      _OPT_FORMATTER=(-f console256)
     else
-      _OPT_FORMATTER="-f console"
+      _OPT_FORMATTER=(-f console)
     fi
-    _OPT="-g $_OPT_FORMATTER $_OPT"
-    pygmentize $_OPT $TMP | $PRINTER
+    # cmd=(ps -a -u -x)
+    # "${cmd[@]}"
+
+    _OPT=(-g "${_OPT_FORMATTER[@]}" "${_OPT[@]}")
+    pygmentize "${_OPT[@]}" "$TMP" | "${PRINTER[@]}"
   else
     warn "install python library 'pygments' for snippet syntax highlighting (pip install pygments)"
     filter_snipp_meta
-    $PRINTER $TMP
+    "${PRINTER[@]}" "$TMP"
   fi
 }
 detect_pygments_lexer(){
-  _OPT=""
+  _OPT=()
   if [ -z "${1//[^.]/}" ]; then
     # has an extension. delegate detection to pygments.
     return
   else
     # try to find "syntax:something" in the head of the file
-    lexer=$(head -n 2 $1 | grep -oE "syntax:.*([[:space:]]|$)" | head -n 1; echo "x")
+    lexer=$(head -n 2 "$1" | grep -oE "syntax:.*([[:space:]]|$)" | head -n 1)
     # this preserves newlines from the subshell
     lexer="${lexer%x}"
     # cutout <lexer> from the "... syntax:<lexer> ...." line
     lexer=${lexer#*syntax:}
     lexer=${lexer% *}
     if [ -n "$lexer" ]; then
-      _OPT="-l $lexer"
+      _OPT=(-l "$lexer")
     else
-      _OPT=""
+      _OPT=()
     fi
   fi
 }
@@ -167,8 +172,8 @@ detect_pygments_lexer(){
 while [[ $1 = -?* ]]; do
   case $1 in
     -h|--help) usage >&2; exit 0 ;;
-    -v|--version) echo "$(basename $0) $VERSION"; exit 0 ;;
-    -p|--print) PRINTER=cat ;;
+    -v|--version) echo "$(basename "$0") $VERSION"; exit 0 ;;
+    -p|--print) PRINTER=(cat) ;;
     --nocolor) COLORED=0 ;;
     --nowarn) WARNINGS=0 ;;
     --printpath) ONLYPRINTSNIPPPATH=1 ;;
@@ -180,24 +185,24 @@ done
 
 case $1 in
   s|show)
-    require_arguments $@;
-    SNIPPET=`echo -e ${2//\//_}`
-    action_show $SNIPPET
+    require_arguments "$@";
+    SNIPPET=$(echo -e "${2//\//_}")
+    action_show "$SNIPPET"
   ;;
   e|edit)
-    require_arguments $@;
-    SNIPPET=`echo -e ${2//\//_}`
-    action_edit $SNIPPET
+    require_arguments "$@";
+    SNIPPET=$(echo -e "${2//\//_}")
+    action_edit "$SNIPPET"
   ;;
   ls|list)
     action_list
   ;;
   rm|remove)
-    require_arguments $@;
-    SNIPPET=`echo -e ${2//\//_}`
-    action_delete $SNIPPET
+    require_arguments "$@";
+    SNIPPET=$(echo -e "${2//\//_}")
+    action_delete "$SNIPPET"
   ;;
   *)
-    action_show $1
+    action_show "$1"
   ;;
 esac
