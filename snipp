@@ -149,7 +149,7 @@ detect_pygments_lexer(){
     return
   else
     # try to find "syntax:something" in the head of the file
-    lexer=$(head -n 2 "$1" | grep -oE "syntax:.*([[:space:]]|$)" | head -n 1)
+    lexer=$(head -n 2 "$1" | grep -oE "syntax:.*([[:space:]]|$)" | awk '{print $1}' | head -n 1)
     # this preserves newlines from the subshell
     lexer="${lexer%x}"
     # cutout <lexer> from the "... syntax:<lexer> ...." line
